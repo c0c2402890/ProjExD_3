@@ -4,10 +4,12 @@ import sys
 import time
 import pygame as pg
 
+
 WIDTH = 1100
 HEIGHT = 650
 NUM_OF_BOMBS = 5
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     yoko, tate = True, True
@@ -16,6 +18,7 @@ def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     if obj_rct.top < 0 or HEIGHT < obj_rct.bottom:
         tate = False
     return yoko, tate
+
 
 class Bird:
     delta = {
@@ -39,15 +42,11 @@ class Bird:
 
     def __init__(self, xy: tuple[int, int]):
         self.img = __class__.imgs[(+5, 0)]
-        self.rct = self.img.get_rect()
+        self.rct: pg.Rect = self.img.get_rect()
         self.rct.center = xy
 
     def change_img(self, num: int, screen: pg.Surface):
         self.img = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 0.9)
-        screen.blit(self.img, self.rct)
-
-    def happy_img(self, num: int, screen: pg.Surface):
-        self.img = pg.transform.rotozoom(pg.image.load(f"fig/6.png"), 0, 0.9)
         screen.blit(self.img, self.rct)
 
     def update(self, key_lst: list[bool], screen: pg.Surface):
@@ -63,9 +62,10 @@ class Bird:
             self.img = __class__.imgs[tuple(sum_mv)]
         screen.blit(self.img, self.rct)
 
+
 class Beam:
-    def __init__(self, bird: Bird):
-        self.img = pg.image.load("fig/beam.png")
+    def __init__(self, bird: "Bird"):
+        self.img = pg.image.load(f"fig/beam.png")
         self.rct = self.img.get_rect()
         self.rct.centery = bird.rct.centery
         self.rct.left = bird.rct.right
@@ -73,8 +73,8 @@ class Beam:
 
     def update(self, screen: pg.Surface):
         self.rct.move_ip(self.vx, self.vy)
-        if check_bound(self.rct) == (True, True):
-            screen.blit(self.img, self.rct)
+        screen.blit(self.img, self.rct)
+
 
 class Bomb:
     def __init__(self, color: tuple[int, int, int], rad: int):
@@ -94,43 +94,51 @@ class Bomb:
         self.rct.move_ip(self.vx, self.vy)
         screen.blit(self.img, self.rct)
 
+
 class Explosion:
-    def __init__(self, bomb: Bomb):
-        base_img = pg.image.load("fig/explosion.png")
-        self.imgs = [base_img, pg.transform.flip(base_img, True, False)]
-        self.rct = self.imgs[0].get_rect(center=bomb.rct.center)
-        self.life = 20
+    def __init__(self, center: tuple[int, int]):
+        self.imgs = [
+            pg.image.load("fig/explosion.gif"),
+            pg.transform.flip(pg.image.load("fig/explosion.gif"), True, False)
+        ]
+        self.life = 30
+        self.img = self.imgs[0]
+        self.rct = self.img.get_rect()
+        self.rct.center = center
 
     def update(self, screen: pg.Surface):
         self.life -= 1
-        img = self.imgs[self.life // 10 % 2]
-        screen.blit(img, self.rct)
+        self.img = self.imgs[self.life // 5 % 2]  # チラチラ防止
+        screen.blit(self.img, self.rct)
+
 
 class Score:
     def __init__(self):
         self.score = 0
         self.fonto = pg.font.SysFont("hgp創英角ﾎﾟｯﾌﾟ体", 30)
         self.color = (0, 0, 255)
+        self.img = self.fonto.render(f"Score: {self.score}", 0, self.color)
         self.pos = (100, HEIGHT - 50)
 
     def update(self, screen: pg.Surface):
-        img = self.fonto.render(f"Score: {self.score}", 0, self.color)
-        img_rct = img.get_rect()
+        self.img = self.fonto.render(f"Score: {self.score}", 0, self.color)
+        img_rct = self.img.get_rect()
         img_rct.center = self.pos
-        screen.blit(img, img_rct)
+        screen.blit(self.img, img_rct)
 
     def increment(self):
         self.score += 1
+
 
 def main():
     pg.display.set_caption("たたかえ！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load("fig/pg_bg.jpg")
     bird = Bird((300, 200))
+    score = Score()
     beams = []
     bombs = [Bomb((255, 0, 0), 10) for _ in range(NUM_OF_BOMBS)]
     explosions = []
-    score = Score()
     clock = pg.time.Clock()
     tmr = 0
 
@@ -147,42 +155,45 @@ def main():
             if bird.rct.colliderect(bomb.rct):
                 bird.change_img(8, screen)
                 fonto = pg.font.Font(None, 80)
-                txt = fonto.render("GAME OVER", True, (255, 0, 0))
+                txt = fonto.render("Game Over", True, (255, 0, 0))
                 screen.blit(txt, [WIDTH//2-150, HEIGHT//2])
                 pg.display.update()
                 time.sleep(1)
                 return
 
-        for i, bomb in enumerate(bombs):
-            if bomb is not None:
-                for j, beam in enumerate(beams):
-                    if beam is not None and beam.rct.colliderect(bomb.rct):
-                        beams[j] = None
-                        bombs[i] = None
-                        explosions.append(Explosion(bomb))
-                        bird.happy_img(6, screen)
-                        score.increment()
-
-        beams = [b for b in beams if b is not None and check_bound(b.rct)[0]]
-        bombs = [b for b in bombs if b is not None]
-        explosions = [e for e in explosions if e.life > 0]
+        # ビームと爆弾の衝突判定
+        for beam in beams[:]:
+            for bomb in bombs[:]:
+                if beam.rct.colliderect(bomb.rct):
+                    explosions.append(Explosion(bomb.rct.center))
+                    bombs.remove(bomb)
+                    beams.remove(beam)
+                    bird.change_img(6, screen)
+                    score.increment()
+                    break
 
         key_lst = pg.key.get_pressed()
         bird.update(key_lst, screen)
+
+        beams = [beam for beam in beams if beam.rct.left < WIDTH]
         for beam in beams:
             beam.update(screen)
+
         for bomb in bombs:
             bomb.update(screen)
-        for ex in explosions:
-            ex.update(screen)
-        score.update(screen)
 
+        explosions = [exp for exp in explosions if exp.life > 0]
+        for exp in explosions:
+            exp.update(screen)
+
+        score.update(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
+
 
 if __name__ == "__main__":
     pg.init()
     main()
     pg.quit()
-    sys.exit() 
+    sys.exit()
