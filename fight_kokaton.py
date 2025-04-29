@@ -1,4 +1,4 @@
-import os
+import os  
 import random
 import sys
 import time
@@ -166,7 +166,6 @@ def main():
                 beams.append(Beam(bird))
 
         screen.blit(bg_img, [0, 0])
-
         for bomb in bombs:
             if bird.rct.colliderect(bomb.rct):
                 bird.change_img(8, screen)
