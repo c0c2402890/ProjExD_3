@@ -94,32 +94,43 @@ class Bomb:
         self.rct.move_ip(self.vx, self.vy)
         screen.blit(self.img, self.rct)
 
+class Explosion:
+    def __init__(self, bomb: Bomb):
+        base_img = pg.image.load("fig/explosion.png")
+        self.imgs = [base_img, pg.transform.flip(base_img, True, False)]
+        self.rct = self.imgs[0].get_rect(center=bomb.rct.center)
+        self.life = 20
+
+    def update(self, screen: pg.Surface):
+        self.life -= 1
+        img = self.imgs[self.life // 10 % 2]
+        screen.blit(img, self.rct)
+
 class Score:
     def __init__(self):
         self.score = 0
         self.fonto = pg.font.SysFont("hgp創英角ﾎﾟｯﾌﾟ体", 30)
         self.color = (0, 0, 255)
-        self.img = self.fonto.render(f"Score: {self.score}", 0, self.color)
         self.pos = (100, HEIGHT - 50)
 
     def update(self, screen: pg.Surface):
-        self.img = self.fonto.render(f"Score: {self.score}", 0, self.color)
-        img_rct = self.img.get_rect()
+        img = self.fonto.render(f"Score: {self.score}", 0, self.color)
+        img_rct = img.get_rect()
         img_rct.center = self.pos
-        screen.blit(self.img, img_rct)
+        screen.blit(img, img_rct)
 
     def increment(self):
         self.score += 1
-
 
 def main():
     pg.display.set_caption("たたかえ！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load("fig/pg_bg.jpg")
     bird = Bird((300, 200))
-    beams = []  # ← ここがリストに変更
-    score = Score()
+    beams = []
     bombs = [Bomb((255, 0, 0), 10) for _ in range(NUM_OF_BOMBS)]
+    explosions = []
+    score = Score()
     clock = pg.time.Clock()
     tmr = 0
 
@@ -128,11 +139,10 @@ def main():
             if event.type == pg.QUIT:
                 return
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.append(Beam(bird))  # ← スペースキーでビーム追加
+                beams.append(Beam(bird))
 
         screen.blit(bg_img, [0, 0])
 
-        # こうかとんと爆弾の当たり判定
         for bomb in bombs:
             if bird.rct.colliderect(bomb.rct):
                 bird.change_img(8, screen)
@@ -143,19 +153,19 @@ def main():
                 time.sleep(1)
                 return
 
-        # ビームと爆弾の衝突判定
         for i, bomb in enumerate(bombs):
             if bomb is not None:
                 for j, beam in enumerate(beams):
                     if beam is not None and beam.rct.colliderect(bomb.rct):
-                        bombs[i] = None
                         beams[j] = None
+                        bombs[i] = None
+                        explosions.append(Explosion(bomb))
                         bird.happy_img(6, screen)
                         score.increment()
 
-        # リストから None や画面外のビームを除外
         beams = [b for b in beams if b is not None and check_bound(b.rct)[0]]
         bombs = [b for b in bombs if b is not None]
+        explosions = [e for e in explosions if e.life > 0]
 
         key_lst = pg.key.get_pressed()
         bird.update(key_lst, screen)
@@ -163,15 +173,16 @@ def main():
             beam.update(screen)
         for bomb in bombs:
             bomb.update(screen)
+        for ex in explosions:
+            ex.update(screen)
         score.update(screen)
 
         pg.display.update()
         tmr += 1
         clock.tick(50)
 
-
 if __name__ == "__main__":
     pg.init()
     main()
     pg.quit()
-    sys.exit()
+    sys.exit() 
