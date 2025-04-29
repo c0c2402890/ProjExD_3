@@ -111,12 +111,13 @@ class Score:
     def increment(self):
         self.score += 1
 
+
 def main():
     pg.display.set_caption("たたかえ！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load("fig/pg_bg.jpg")
     bird = Bird((300, 200))
-    beam = None
+    beams = []  # ← ここがリストに変更
     score = Score()
     bombs = [Bomb((255, 0, 0), 10) for _ in range(NUM_OF_BOMBS)]
     clock = pg.time.Clock()
@@ -127,7 +128,7 @@ def main():
             if event.type == pg.QUIT:
                 return
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beam = Beam(bird)
+                beams.append(Beam(bird))  # ← スペースキーでビーム追加
 
         screen.blit(bg_img, [0, 0])
 
@@ -143,27 +144,31 @@ def main():
                 return
 
         # ビームと爆弾の衝突判定
-        for j, bomb in enumerate(bombs):
-            if beam is not None and bomb is not None:
-                if beam.rct.colliderect(bomb.rct):
-                    beam = None
-                    bombs[j] = None
-                    bird.happy_img(6, screen)
-                    score.increment()
+        for i, bomb in enumerate(bombs):
+            if bomb is not None:
+                for j, beam in enumerate(beams):
+                    if beam is not None and beam.rct.colliderect(bomb.rct):
+                        bombs[i] = None
+                        beams[j] = None
+                        bird.happy_img(6, screen)
+                        score.increment()
 
+        # リストから None や画面外のビームを除外
+        beams = [b for b in beams if b is not None and check_bound(b.rct)[0]]
         bombs = [b for b in bombs if b is not None]
 
         key_lst = pg.key.get_pressed()
         bird.update(key_lst, screen)
-        if beam is not None:
+        for beam in beams:
             beam.update(screen)
         for bomb in bombs:
             bomb.update(screen)
-
         score.update(screen)
+
         pg.display.update()
         tmr += 1
         clock.tick(50)
+
 
 if __name__ == "__main__":
     pg.init()
